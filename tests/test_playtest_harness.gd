@@ -51,15 +51,13 @@ static func test_scenario_a_successful_spike() -> bool:
 
 	manager.request_feed()
 
-	# Simulate athlete airborne approach at optimal attack location
 	player.position = Vector3(0.0, 1.8, 2.5)
 	player.current_state = 1 # AIRBORNE
 
-	# Place ball entering player's sweet spot during feed
 	var anchor = ContactResolver.get_contact_anchor(player.position, Vector3(0, 0, -1), player.attributes)
 	ball.position = anchor + Vector3(0.02, 0.01, 0.01)
 
-	# Trigger attack through real player signal pathway
+	# Trigger attack via active contact check
 	player.attack_attempted.emit(
 		player.position,
 		true,
@@ -74,7 +72,6 @@ static func test_scenario_a_successful_spike() -> bool:
 		main.free()
 		return false
 
-	# Simulate landing on opponent court
 	ball._process_landing(Vector3(0.5, 0.0, -4.5))
 
 	if manager.in_bounds_hits != 1 or manager.completed_attempts != 1:
@@ -98,7 +95,24 @@ static func test_scenario_b_early_swing() -> bool:
 	var anchor = ContactResolver.get_contact_anchor(player.position, Vector3(0, 0, -1), player.attributes)
 	ball.position = anchor
 
-	# Early swing in WINDUP phase
+	# Early swing: in WINDUP phase, contact cannot occur
+	var res = ContactResolver.resolve_spike(
+		player.position,
+		true,
+		ball.position,
+		Vector3(0, -0.15, -1.0),
+		player.attributes,
+		Vector3(0, 0, -1),
+		ContactResolver.AttackSwingPhase.WINDUP,
+		0.03
+	)
+
+	if res.quality != ContactResolver.HitQuality.MISS:
+		printerr("[FAIL] Scenario B: early swing in windup was not rejected")
+		main.free()
+		return false
+
+	# Notify player swing attempted
 	player.attack_attempted.emit(
 		player.position,
 		true,
@@ -108,8 +122,11 @@ static func test_scenario_b_early_swing() -> bool:
 		0.03
 	)
 
+	# Ball lands without contact
+	ball._process_landing(Vector3(0.0, 0.0, 2.5))
+
 	if manager.ball_has_been_hit or manager.missed_swings != 1:
-		printerr("[FAIL] Scenario B: early swing in windup was not rejected")
+		printerr("[FAIL] Scenario B: missed swing not registered after ball landed")
 		main.free()
 		return false
 
@@ -129,7 +146,23 @@ static func test_scenario_c_late_swing() -> bool:
 	var anchor = ContactResolver.get_contact_anchor(player.position, Vector3(0, 0, -1), player.attributes)
 	ball.position = anchor
 
-	# Late swing in FOLLOW_THROUGH phase
+	# Late swing: in FOLLOW_THROUGH phase
+	var res = ContactResolver.resolve_spike(
+		player.position,
+		true,
+		ball.position,
+		Vector3(0, -0.15, -1.0),
+		player.attributes,
+		Vector3(0, 0, -1),
+		ContactResolver.AttackSwingPhase.FOLLOW_THROUGH,
+		0.32
+	)
+
+	if res.quality != ContactResolver.HitQuality.MISS:
+		printerr("[FAIL] Scenario C: late swing was not rejected")
+		main.free()
+		return false
+
 	player.attack_attempted.emit(
 		player.position,
 		true,
@@ -139,8 +172,10 @@ static func test_scenario_c_late_swing() -> bool:
 		0.32
 	)
 
+	ball._process_landing(Vector3(0.0, 0.0, 2.5))
+
 	if manager.ball_has_been_hit or manager.missed_swings != 1:
-		printerr("[FAIL] Scenario C: late swing was not rejected")
+		printerr("[FAIL] Scenario C: late swing not registered as missed swing")
 		main.free()
 		return false
 
@@ -157,7 +192,6 @@ static func test_scenario_d_invalid_distance() -> bool:
 	manager.request_feed()
 	player.position = Vector3(0.0, 1.8, 2.5)
 	player.current_state = 1
-	# Ball placed 5 meters away
 	ball.position = Vector3(5.0, 1.8, 2.5)
 
 	player.attack_attempted.emit(
@@ -168,6 +202,8 @@ static func test_scenario_d_invalid_distance() -> bool:
 		ContactResolver.AttackSwingPhase.ACTIVE_CONTACT,
 		0.12
 	)
+
+	ball._process_landing(Vector3(0.0, 0.0, 2.5))
 
 	if manager.ball_has_been_hit or manager.missed_swings != 1:
 		printerr("[FAIL] Scenario D: distant attack was not rejected")
@@ -184,13 +220,13 @@ static func test_scenario_e_net_collision() -> bool:
 	var ball = main.get_node("Volleyball")
 
 	manager.request_feed()
-	var initial_net_faults = manager.net_faults
+	var initial_net_collisions = manager.feed_net_collisions
 
-	# Simulate net hit signal
+	# Simulate incoming feed hitting net
 	ball.ball_net_hit.emit()
 
-	if manager.net_faults != initial_net_faults + 1:
-		printerr("[FAIL] Scenario E: net fault was not recorded")
+	if manager.feed_net_collisions != initial_net_collisions + 1:
+		printerr("[FAIL] Scenario E: feed net collision was not recorded")
 		main.free()
 		return false
 
