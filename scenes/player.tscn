@@ -1,0 +1,41 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_controller"]
+
+[sub_resource type="CapsuleShape3D" id="capsule_shape"]
+radius = 0.35
+height = 1.9
+
+[sub_resource type="StandardMaterial3D" id="mat_jersey"]
+albedo_color = Color(0.15, 0.45, 0.85, 1)
+roughness = 0.5
+
+[sub_resource type="CapsuleMesh" id="body_mesh"]
+material = SubResource("mat_jersey")
+radius = 0.35
+height = 1.9
+
+[sub_resource type="StandardMaterial3D" id="mat_head"]
+albedo_color = Color(0.9, 0.75, 0.65, 1)
+
+[sub_resource type="SphereMesh" id="head_mesh"]
+material = SubResource("mat_head")
+radius = 0.22
+height = 0.44
+
+[node name="Player" type="CharacterBody3D"]
+script = ExtResource("1_controller")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+shape = SubResource("capsule_shape")
+
+[node name="Visuals" type="Node3D" parent="."]
+
+[node name="TorsoMesh" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+mesh = SubResource("body_mesh")
+
+[node name="HeadMesh" type="MeshInstance3D" parent="Visuals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+mesh = SubResource("head_mesh")

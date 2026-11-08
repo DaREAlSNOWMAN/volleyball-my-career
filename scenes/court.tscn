@@ -1,0 +1,165 @@
+[gd_scene load_steps=18 format=3]
+
+[sub_resource type="BoxShape3D" id="floor_shape"]
+size = Vector3(22, 1, 30)
+
+[sub_resource type="StandardMaterial3D" id="mat_gym_floor"]
+albedo_color = Color(0.18, 0.22, 0.28, 1)
+roughness = 0.45
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+material = SubResource("mat_gym_floor")
+size = Vector3(22, 1, 30)
+
+[sub_resource type="StandardMaterial3D" id="mat_court_surface"]
+albedo_color = Color(0.85, 0.52, 0.22, 1)
+roughness = 0.35
+
+[sub_resource type="BoxMesh" id="court_mesh"]
+material = SubResource("mat_court_surface")
+size = Vector3(9, 0.02, 18)
+
+[sub_resource type="StandardMaterial3D" id="mat_lines"]
+albedo_color = Color(0.96, 0.96, 0.96, 1)
+
+[sub_resource type="BoxMesh" id="boundary_line_x"]
+material = SubResource("mat_lines")
+size = Vector3(9.1, 0.025, 0.05)
+
+[sub_resource type="BoxMesh" id="boundary_line_z"]
+material = SubResource("mat_lines")
+size = Vector3(0.05, 0.025, 18.05)
+
+[sub_resource type="BoxMesh" id="attack_line"]
+material = SubResource("mat_lines")
+size = Vector3(9.0, 0.025, 0.05)
+
+[sub_resource type="BoxShape3D" id="net_shape"]
+size = Vector3(9.6, 1.0, 0.08)
+
+[sub_resource type="StandardMaterial3D" id="mat_net"]
+transparency = 1
+albedo_color = Color(0.85, 0.85, 0.85, 0.7)
+roughness = 0.6
+
+[sub_resource type="BoxMesh" id="net_mesh"]
+material = SubResource("mat_net")
+size = Vector3(9.5, 1.0, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="mat_posts"]
+albedo_color = Color(0.2, 0.2, 0.25, 1)
+metallic = 0.6
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="post_mesh"]
+material = SubResource("mat_posts")
+top_radius = 0.06
+bottom_radius = 0.06
+height = 2.7
+
+[sub_resource type="CylinderShape3D" id="post_shape"]
+height = 2.7
+radius = 0.08
+
+[sub_resource type="StandardMaterial3D" id="mat_walls"]
+albedo_color = Color(0.12, 0.14, 0.18, 1)
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="wall_mesh_z"]
+material = SubResource("mat_walls")
+size = Vector3(26, 8, 1)
+
+[sub_resource type="BoxShape3D" id="wall_shape_z"]
+size = Vector3(26, 8, 1)
+
+[node name="Court" type="Node3D"]
+
+[node name="GymFloor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GymFloor"]
+shape = SubResource("floor_shape")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GymFloor"]
+mesh = SubResource("floor_mesh")
+
+[node name="CourtSurface" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+mesh = SubResource("court_mesh")
+
+[node name="Lines" type="Node3D" parent="."]
+
+[node name="BaselineOpponent" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, -9)
+mesh = SubResource("boundary_line_x")
+
+[node name="BaselinePlayer" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 9)
+mesh = SubResource("boundary_line_x")
+
+[node name="CenterLine" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+mesh = SubResource("boundary_line_x")
+
+[node name="SidelineLeft" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 0.02, 0)
+mesh = SubResource("boundary_line_z")
+
+[node name="SidelineRight" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.02, 0)
+mesh = SubResource("boundary_line_z")
+
+[node name="AttackLinePlayer" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 3)
+mesh = SubResource("attack_line")
+
+[node name="AttackLineOpponent" type="MeshInstance3D" parent="Lines"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, -3)
+mesh = SubResource("attack_line")
+
+[node name="NetStructure" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.93, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="NetStructure"]
+shape = SubResource("net_shape")
+
+[node name="NetMesh" type="MeshInstance3D" parent="NetStructure"]
+mesh = SubResource("net_mesh")
+
+[node name="PostLeft" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.0, 1.35, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PostLeft"]
+mesh = SubResource("post_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PostLeft"]
+shape = SubResource("post_shape")
+
+[node name="PostRight" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0, 1.35, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="PostRight"]
+mesh = SubResource("post_mesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PostRight"]
+shape = SubResource("post_shape")
+
+[node name="SurroundingWalls" type="Node3D" parent="."]
+
+[node name="WallBackOpponent" type="StaticBody3D" parent="SurroundingWalls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, -14)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SurroundingWalls/WallBackOpponent"]
+mesh = SubResource("wall_mesh_z")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SurroundingWalls/WallBackOpponent"]
+shape = SubResource("wall_shape_z")
+
+[node name="WallBackPlayer" type="StaticBody3D" parent="SurroundingWalls"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 14)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SurroundingWalls/WallBackPlayer"]
+mesh = SubResource("wall_mesh_z")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SurroundingWalls/WallBackPlayer"]
+shape = SubResource("wall_shape_z")

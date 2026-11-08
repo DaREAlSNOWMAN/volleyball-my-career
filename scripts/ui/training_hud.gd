@@ -1,0 +1,38 @@
+class_name TrainingHUD
+extends Control
+
+@onready var exercise_title_label: Label = $MarginContainer/VBoxContainer/TopBar/ExerciseTitle
+@onready var stats_label: Label = $MarginContainer/VBoxContainer/TopBar/StatsContainer/StatsLabel
+@onready var feedback_panel: PanelContainer = $MarginContainer/VBoxContainer/CenterFeedback/FeedbackPanel
+@onready var feedback_label: Label = $MarginContainer/VBoxContainer/CenterFeedback/FeedbackPanel/FeedbackLabel
+@onready var controls_hint_label: Label = $MarginContainer/VBoxContainer/BottomBar/ControlsHint
+
+var feedback_timer: float = 0.0
+
+func _ready():
+	feedback_panel.visible = false
+
+func _process(delta: float):
+	if feedback_timer > 0.0:
+		feedback_timer -= delta
+		if feedback_timer <= 0.0:
+			feedback_panel.visible = false
+
+func set_exercise_title(title: String):
+	if exercise_title_label:
+		exercise_title_label.text = title
+
+func update_stats(successful: int, missed: int, in_bounds: int, out_of_bounds: int, total_reps: int):
+	if stats_label:
+		stats_label.text = "Reps: %d | Hits: %d | Misses: %d | In-Bounds: %d | Out: %d" % [
+			total_reps, successful, missed, in_bounds, out_of_bounds
+		]
+
+func show_feedback(message: String, is_positive: bool = true, duration: float = 2.0):
+	if not feedback_panel or not feedback_label:
+		return
+	feedback_label.text = message
+	var color = Color(0.2, 0.9, 0.3) if is_positive else Color(0.9, 0.3, 0.2)
+	feedback_label.modulate = color
+	feedback_panel.visible = true
+	feedback_timer = duration

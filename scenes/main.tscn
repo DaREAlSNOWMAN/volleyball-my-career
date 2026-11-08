@@ -1,0 +1,45 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/court.tscn" id="1_court"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/volleyball.tscn" id="3_ball"]
+[ext_resource type="PackedScene" path="res://scenes/training_launcher.tscn" id="4_launcher"]
+[ext_resource type="PackedScene" path="res://scenes/training_hud.tscn" id="5_hud"]
+[ext_resource type="Script" path="res://scripts/camera/follow_camera.gd" id="6_cam"]
+[ext_resource type="Script" path="res://scripts/training/training_manager.gd" id="7_manager"]
+
+[node name="Main" type="Node3D"]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 5, 12, 5)
+shadow_enabled = true
+
+[node name="Court" parent="." instance=ExtResource("1_court")]
+
+[node name="Player" parent="." node_paths=PackedStringArray("follow_camera") instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.0)
+follow_camera = NodePath("../FollowCamera")
+
+[node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("target")]
+script = ExtResource("6_cam")
+target = NodePath("../Player")
+
+[node name="Camera3D" type="Camera3D" parent="FollowCamera"]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 2, 4.5)
+current = true
+fov = 65.0
+
+[node name="Volleyball" parent="." instance=ExtResource("3_ball")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -10, 0)
+
+[node name="TrainingLauncher" parent="." instance=ExtResource("4_launcher")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.0, -4.5)
+
+[node name="TrainingHUD" parent="." instance=ExtResource("5_hud")]
+
+[node name="TrainingManager" type="Node" parent="." node_paths=PackedStringArray("player", "ball", "launcher", "hud")]
+script = ExtResource("7_manager")
+player = NodePath("../Player")
+ball = NodePath("../Volleyball")
+launcher = NodePath("../TrainingLauncher")
+hud = NodePath("../TrainingHUD")

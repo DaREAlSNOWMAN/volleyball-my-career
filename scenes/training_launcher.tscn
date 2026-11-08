@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/training/training_launcher.gd" id="1_launcher"]
+
+[sub_resource type="StandardMaterial3D" id="mat_launcher"]
+albedo_color = Color(0.2, 0.7, 0.4, 1)
+metallic = 0.5
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="launcher_base_mesh"]
+material = SubResource("mat_launcher")
+size = Vector3(0.6, 0.8, 0.6)
+
+[sub_resource type="CylinderMesh" id="launcher_barrel_mesh"]
+material = SubResource("mat_launcher")
+top_radius = 0.16
+bottom_radius = 0.16
+height = 0.6
+
+[node name="TrainingLauncher" type="Node3D"]
+script = ExtResource("1_launcher")
+
+[node name="BaseMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("launcher_base_mesh")
+
+[node name="BarrelMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, -0.707107, 0, 0.707107, 0.707107, 0, 0.8, 0.2)
+mesh = SubResource("launcher_barrel_mesh")
