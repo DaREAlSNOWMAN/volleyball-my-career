@@ -18,7 +18,7 @@ func _ready():
 func get_launcher_position() -> Vector3:
 	return global_position if is_inside_tree() else position
 
-## Feeds a ball along a predictable, readable arc toward the player attack zone
+## Feeds a ball along a predictable, readable arc toward the player attack zone using apex height
 func feed_ball(ball_instance: VolleyballController = null) -> VolleyballController:
 	if ball_instance:
 		active_ball = ball_instance
@@ -32,13 +32,24 @@ func feed_ball(ball_instance: VolleyballController = null) -> VolleyballControll
 
 	var start_pos = get_launcher_position()
 	var target_pos = settings.feed_target
-	var duration = settings.feed_duration
 	var gravity = ProjectSettings.get_setting("physics/3d/default_gravity", 9.81)
 
-	# Calculate ballistic launch velocity required to land/arrive at target_pos in duration seconds
-	var vx = (target_pos.x - start_pos.x) / duration
-	var vz = (target_pos.z - start_pos.z) / duration
-	var vy = (target_pos.y - start_pos.y + 0.5 * gravity * duration * duration) / duration
+	# Calculate ballistic arc utilizing settings.feed_arc_height:
+	# Peak height H must be at least slightly higher than start and target
+	var min_apex = maxf(start_pos.y, target_pos.y) + 0.6
+	var apex_height = maxf(settings.feed_arc_height, min_apex)
+
+	# Upward velocity to reach apex from start: v_y = sqrt(2 * g * (apex - y_start))
+	var vy = sqrt(2.0 * gravity * (apex_height - start_pos.y))
+	# Time to ascend to apex: t_up = vy / g
+	var t_up = vy / gravity
+	# Time to descend from apex to target: t_down = sqrt(2 * (apex - y_target) / g)
+	var t_down = sqrt(2.0 * (apex_height - target_pos.y) / gravity)
+	var total_time = t_up + t_down
+
+	# Horizontal velocities to hit target_pos exactly at total_time
+	var vx = (target_pos.x - start_pos.x) / total_time
+	var vz = (target_pos.z - start_pos.z) / total_time
 
 	var launch_velocity = Vector3(vx, vy, vz)
 	active_ball.launch(start_pos, launch_velocity)

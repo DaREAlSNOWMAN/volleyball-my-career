@@ -2,7 +2,10 @@ class_name TrainingHUD
 extends Control
 
 @onready var exercise_title_label: Label = $MarginContainer/VBoxContainer/TopBar/ExerciseTitle
+@onready var phase_label: Label = $MarginContainer/VBoxContainer/TopBar/PhaseLabel
 @onready var stats_label: Label = $MarginContainer/VBoxContainer/TopBar/StatsContainer/StatsLabel
+@onready var readiness_indicator: PanelContainer = $MarginContainer/VBoxContainer/ReadinessContainer/ReadinessPanel
+@onready var readiness_label: Label = $MarginContainer/VBoxContainer/ReadinessContainer/ReadinessPanel/ReadinessLabel
 @onready var feedback_panel: PanelContainer = $MarginContainer/VBoxContainer/CenterFeedback/FeedbackPanel
 @onready var feedback_label: Label = $MarginContainer/VBoxContainer/CenterFeedback/FeedbackPanel/FeedbackLabel
 @onready var controls_hint_label: Label = $MarginContainer/VBoxContainer/BottomBar/ControlsHint
@@ -11,6 +14,7 @@ var feedback_timer: float = 0.0
 
 func _ready():
 	feedback_panel.visible = false
+	readiness_indicator.visible = false
 
 func _process(delta: float):
 	if feedback_timer > 0.0:
@@ -22,10 +26,27 @@ func set_exercise_title(title: String):
 	if exercise_title_label:
 		exercise_title_label.text = title
 
-func update_stats(successful: int, missed: int, in_bounds: int, out_of_bounds: int, total_reps: int):
+func set_training_phase(phase_name: String):
+	if phase_label:
+		phase_label.text = "Phase: " + phase_name
+
+func set_window_readiness(is_ready: bool):
+	if readiness_indicator:
+		readiness_indicator.visible = is_ready
+
+func update_stats(
+	feeds: int,
+	completed: int,
+	clean: int,
+	weak: int,
+	missed: int,
+	untouched: int,
+	in_bounds: int,
+	out_of_bounds: int
+):
 	if stats_label:
-		stats_label.text = "Reps: %d | Hits: %d | Misses: %d | In-Bounds: %d | Out: %d" % [
-			total_reps, successful, missed, in_bounds, out_of_bounds
+		stats_label.text = "Feeds: %d | Hits: %d (Clean: %d, Weak: %d) | Misses: %d | Untouched: %d | In: %d | Out: %d" % [
+			feeds, (clean + weak), clean, weak, missed, untouched, in_bounds, out_of_bounds
 		]
 
 func show_feedback(message: String, is_positive: bool = true, duration: float = 2.0):

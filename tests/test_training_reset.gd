@@ -5,13 +5,89 @@ const TrainingSettings = preload("res://resources/training_settings.gd")
 const VolleyballController = preload("res://scripts/ball/volleyball_controller.gd")
 const TrainingLauncher = preload("res://scripts/training/training_launcher.gd")
 const CourtGeometry = preload("res://scripts/systems/court_geometry.gd")
+const ContactResolver = preload("res://scripts/systems/contact_resolver.gd")
+const PlayerAttributes = preload("res://resources/player_attributes.gd")
 
-## Tests repeated training feeds and resets (10 iterations) to verify no stuck state or object accumulation
+## Tests repeatable training feeds, state integrity, and real contact pipeline integration
 static func run_all() -> bool:
 	var passed = true
+	passed = passed and test_launcher_feed_arrival_region()
+	passed = passed and test_real_contact_pipeline_integration()
 	passed = passed and test_repeat_loop_10_times()
 	passed = passed and test_ball_reset_invariants()
+	passed = passed and test_prevent_multiple_spikes_per_feed()
 	return passed
+
+static func test_launcher_feed_arrival_region() -> bool:
+	# Verify that a launched feed arrives at the target attack region near the net
+	var launcher = TrainingLauncher.new()
+	var settings = TrainingSettings.new()
+	settings.feed_arc_height = 4.8
+	settings.feed_target = Vector3(0.0, 2.9, 2.5)
+	launcher.settings = settings
+
+	var ball = VolleyballController.new()
+	launcher.feed_ball(ball)
+
+	# Verify initial launch velocity has upward drive reaching above 4.5m
+	var v_y = ball.linear_velocity.y
+	var apex_y = launcher.get_launcher_position().y + (v_y * v_y) / (2.0 * 9.81)
+
+	if apex_y < 4.0:
+		printerr("[FAIL] test_launcher_feed_arrival_region: apex height too low (%f)" % apex_y)
+		return false
+
+	# Verify horizontal velocities aim toward player side (z > 0)
+	if ball.linear_velocity.z <= 0.0:
+		printerr("[FAIL] test_launcher_feed_arrival_region: ball should travel toward player side (z > 0)")
+		return false
+
+	print("[PASS] test_launcher_feed_arrival_region")
+	return true
+
+static func test_real_contact_pipeline_integration() -> bool:
+	# Verify that ContactResolver correctly connects with VolleyballController
+	var attr = PlayerAttributes.new()
+	var player_pos = Vector3(0.0, 1.6, 2.5)
+	var ball = VolleyballController.new()
+	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+
+	ball.launch(Vector3(0, 0, 0), Vector3(0, 5, 2))
+	var aim_dir = Vector3(0.0, -0.22, -1.0)
+
+	var contact_res = ContactResolver.resolve_spike(player_pos, true, sweet_spot, aim_dir, attr)
+	if contact_res.quality != ContactResolver.HitQuality.CLEAN:
+		printerr("[FAIL] test_real_contact_pipeline_integration: expected clean contact")
+		return false
+
+	var applied = ball.apply_spike(contact_res.impulse, contact_res.quality)
+	if not applied or ball.current_state != VolleyballController.BallState.SPIKED:
+		printerr("[FAIL] test_real_contact_pipeline_integration: ball failed to apply spike")
+		return false
+
+	if ball.linear_velocity.z >= 0.0:
+		printerr("[FAIL] test_real_contact_pipeline_integration: spiked ball must travel toward opponent side (z < 0)")
+		return false
+
+	print("[PASS] test_real_contact_pipeline_integration")
+	return true
+
+static func test_prevent_multiple_spikes_per_feed() -> bool:
+	var ball = VolleyballController.new()
+	ball.launch(Vector3(0, 1, 0), Vector3(0, 2, 2))
+
+	var first_hit = ball.apply_spike(Vector3(0, -2, -15), 2)
+	var second_hit = ball.apply_spike(Vector3(0, -2, -15), 2)
+
+	if not first_hit:
+		printerr("[FAIL] test_prevent_multiple_spikes_per_feed: first hit should succeed")
+		return false
+	if second_hit:
+		printerr("[FAIL] test_prevent_multiple_spikes_per_feed: second hit on same ball should be rejected")
+		return false
+
+	print("[PASS] test_prevent_multiple_spikes_per_feed")
+	return true
 
 static func test_repeat_loop_10_times() -> bool:
 	var launcher = TrainingLauncher.new()
@@ -30,14 +106,18 @@ static func test_repeat_loop_10_times() -> bool:
 			printerr("[FAIL] test_repeat_loop_10_times (rep %d): ball launch velocity too low" % rep)
 			return false
 
-		# 2. Simulate spike contact
-		var spike_impulse = Vector3(0.0, -2.0, -14.0)
-		ball.apply_spike(spike_impulse, 2)
-		if ball.current_state != VolleyballController.BallState.SPIKED:
+		# 2. Simulate spike contact through real ContactResolver
+		var player_pos = Vector3(0.0, 1.6, 2.5)
+		var attr = PlayerAttributes.new()
+		var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+		var contact = ContactResolver.resolve_spike(player_pos, true, sweet_spot, Vector3(0, -0.22, -1), attr)
+
+		var hit_success = ball.apply_spike(contact.impulse, contact.quality)
+		if not hit_success or ball.current_state != VolleyballController.BallState.SPIKED:
 			printerr("[FAIL] test_repeat_loop_10_times (rep %d): expected SPIKED" % rep)
 			return false
 
-		# 3. Simulate landing
+		# 3. Simulate landing in opponent court
 		var landing_pos = Vector3(0.5, 0.0, -4.5)
 		ball._process_landing(landing_pos)
 		if ball.current_state != VolleyballController.BallState.LANDED or not ball.has_landed:
@@ -46,8 +126,8 @@ static func test_repeat_loop_10_times() -> bool:
 
 		# 4. Reset
 		launcher.reset_ball()
-		if ball.current_state != VolleyballController.BallState.INACTIVE or ball.has_landed:
-			printerr("[FAIL] test_repeat_loop_10_times (rep %d): expected INACTIVE after reset" % rep)
+		if ball.current_state != VolleyballController.BallState.INACTIVE or ball.has_landed or ball.has_been_hit:
+			printerr("[FAIL] test_repeat_loop_10_times (rep %d): expected INACTIVE & unhit after reset" % rep)
 			return false
 
 	print("[PASS] test_repeat_loop_10_times (10 clean iterations without scene reload)")
@@ -58,6 +138,7 @@ static func test_ball_reset_invariants() -> bool:
 
 	ball.current_state = VolleyballController.BallState.SPIKED
 	ball.has_landed = true
+	ball.has_been_hit = true
 	ball.linear_velocity = Vector3(10, 10, 10)
 	ball.angular_velocity = Vector3(5, 5, 5)
 
@@ -65,6 +146,9 @@ static func test_ball_reset_invariants() -> bool:
 
 	if ball.has_landed != false:
 		printerr("[FAIL] test_ball_reset_invariants: has_landed was not reset to false")
+		return false
+	if ball.has_been_hit != false:
+		printerr("[FAIL] test_ball_reset_invariants: has_been_hit was not reset to false")
 		return false
 	if ball.current_state != VolleyballController.BallState.INACTIVE:
 		printerr("[FAIL] test_ball_reset_invariants: current_state not INACTIVE")

@@ -17,6 +17,7 @@ enum BallState {
 
 var current_state: BallState = BallState.INACTIVE
 var has_landed: bool = false
+var has_been_hit: bool = false
 var last_hit_quality: int = ContactResolver.HitQuality.MISS
 
 # Floor detection threshold
@@ -57,21 +58,27 @@ func get_ball_position() -> Vector3:
 func launch(start_pos: Vector3, initial_velocity: Vector3):
 	reset(start_pos)
 	current_state = BallState.IN_FLIGHT
+	has_been_hit = false
 	linear_velocity = initial_velocity
 	angular_velocity = Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2))
 
-## Apply spike impulse to the ball
-func apply_spike(impulse: Vector3, quality: int):
+## Apply spike impulse to the ball (enforcing one hit per feed)
+func apply_spike(impulse: Vector3, quality: int) -> bool:
+	if has_been_hit:
+		return false
+	has_been_hit = true
 	last_hit_quality = quality
 	current_state = BallState.SPIKED
 	linear_velocity = impulse
 	# Add slight authentic topspin when spiked
 	angular_velocity = Vector3(-impulse.length() * 0.8, 0, 0)
 	ball_hit_registered.emit(quality, impulse)
+	return true
 
 ## Reset the ball physics state completely
 func reset(new_pos: Vector3 = Vector3(0, -10, 0)):
 	has_landed = false
+	has_been_hit = false
 	last_hit_quality = ContactResolver.HitQuality.MISS
 	current_state = BallState.INACTIVE
 	linear_velocity = Vector3.ZERO

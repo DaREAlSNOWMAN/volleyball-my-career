@@ -8,7 +8,7 @@ const PlayerAttributes = preload("res://resources/player_attributes.gd")
 const FollowCamera = preload("res://scripts/camera/follow_camera.gd")
 
 signal state_changed(old_state: int, new_state: int)
-signal attack_attempted(player_pos: Vector3, is_airborne: bool, aim_direction: Vector3)
+signal attack_attempted(player_pos: Vector3, is_airborne: bool, aim_direction: Vector3, facing_dir: Vector3)
 signal ball_hit(quality: int, impulse: Vector3, message: String)
 
 @export var attributes: Resource # PlayerAttributes
@@ -18,8 +18,10 @@ var current_state: int = PlayerState.State.GROUNDED
 var attack_cooldown_timer: float = 0.0
 var jump_timer: float = 0.0
 var has_attacked_in_current_jump: bool = false
+var swing_animation_timer: float = 0.0
 
 @onready var visuals: Node3D = $Visuals
+@onready var right_arm_pivot: Node3D = $Visuals/RightArmPivot
 
 func _ready():
 	if not attributes:
@@ -35,6 +37,7 @@ func _physics_process(delta: float):
 	_handle_input_movement(delta)
 	_handle_jump()
 	_handle_attack_input()
+	_update_arm_swing_visual(delta)
 
 	move_and_slide()
 
@@ -83,13 +86,18 @@ func _handle_input_movement(delta: float):
 	velocity.x = move_toward(velocity.x, target_vel_x, accel * delta)
 	velocity.z = move_toward(velocity.z, target_vel_z, accel * delta)
 
-	# Face towards movement direction or towards opponent court
+	var turn_rate = attributes.turn_speed if "turn_speed" in attributes else 14.0
+
+	# Face towards movement direction, camera aim, or toward net
 	if move_direction.length_squared() > 0.01 and visuals:
 		var target_angle = atan2(-move_direction.x, -move_direction.z)
-		visuals.rotation.y = lerp_angle(visuals.rotation.y, target_angle, 12.0 * delta)
-	elif visuals and current_state == PlayerState.State.AIRBORNE:
-		# When airborne, athlete naturally faces the net (negative Z direction)
-		visuals.rotation.y = lerp_angle(visuals.rotation.y, 0.0, 8.0 * delta)
+		visuals.rotation.y = lerp_angle(visuals.rotation.y, target_angle, turn_rate * delta)
+	elif visuals and (current_state == PlayerState.State.AIRBORNE or current_state == PlayerState.State.ATTACKING):
+		var target_angle = 0.0 # Net direction (negative Z)
+		if follow_camera and follow_camera.has_method("get_camera_forward"):
+			var cam_fwd = follow_camera.get_camera_forward()
+			target_angle = atan2(-cam_fwd.x, -cam_fwd.z)
+		visuals.rotation.y = lerp_angle(visuals.rotation.y, target_angle, turn_rate * delta)
 
 func _handle_jump():
 	if Input.is_action_just_pressed("jump") and is_on_floor() and jump_timer <= 0.0:
@@ -101,17 +109,41 @@ func _handle_jump():
 func _handle_attack_input():
 	if Input.is_action_just_pressed("attack"):
 		if attack_cooldown_timer <= 0.0 and not has_attacked_in_current_jump:
-			attack_cooldown_timer = 0.3
+			attack_cooldown_timer = 0.35
 			var is_airborne = (current_state == PlayerState.State.AIRBORNE or not is_on_floor())
 			if is_airborne:
 				has_attacked_in_current_jump = true
 				_set_state(PlayerState.State.ATTACKING)
 
-			var aim_dir = Vector3(0, -0.25, -1.0).normalized()
+			# Trigger visual arm swing
+			swing_animation_timer = 0.25
+
+			var aim_dir = Vector3(0, -0.22, -1.0).normalized()
 			if follow_camera and follow_camera.has_method("get_aim_direction"):
 				aim_dir = follow_camera.get_aim_direction()
 
-			attack_attempted.emit(global_position, is_airborne, aim_dir)
+			var facing_dir = get_player_facing_direction()
+			attack_attempted.emit(global_position, is_airborne, aim_dir, facing_dir)
+
+func _update_arm_swing_visual(delta: float):
+	if not right_arm_pivot:
+		return
+
+	if swing_animation_timer > 0.0:
+		swing_animation_timer -= delta
+		# Animate arm swinging forward and down: rotate X from ~120 deg (wound up) down to -60 deg
+		var progress = 1.0 - (swing_animation_timer / 0.25)
+		var swing_angle = lerpf(PI * 0.7, -PI * 0.35, progress)
+		right_arm_pivot.rotation.x = swing_angle
+	else:
+		# Idle arm position, slightly raised if airborne
+		var rest_angle = -PI * 0.4 if (current_state == PlayerState.State.AIRBORNE or current_state == PlayerState.State.ATTACKING) else 0.0
+		right_arm_pivot.rotation.x = lerp_angle(right_arm_pivot.rotation.x, rest_angle, 10.0 * delta)
+
+func get_player_facing_direction() -> Vector3:
+	if visuals:
+		return -visuals.global_transform.basis.z
+	return Vector3(0, 0, -1)
 
 func _set_state(new_state: int):
 	if current_state == new_state:

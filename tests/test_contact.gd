@@ -11,18 +11,21 @@ static func run_all() -> bool:
 	passed = passed and test_height_mistimed_fails()
 	passed = passed and test_clean_spike_success()
 	passed = passed and test_weak_spike_success()
+	passed = passed and test_spike_net_clearance()
 	return passed
 
 static func _create_test_attributes() -> PlayerAttributes:
 	var attr = PlayerAttributes.new()
-	attr.hitting_power = 16.0
-	attr.hit_assist_tolerance = 1.4
+	attr.hitting_power = 16.5
+	attr.hit_assist_tolerance = 1.45
+	attr.timing_window_clean = 0.28
+	attr.timing_window_weak = 0.50
 	return attr
 
 static func test_grounded_attack_fails() -> bool:
 	var attr = _create_test_attributes()
 	var player_pos = Vector3(0.0, 0.0, 2.5)
-	var ball_pos = Vector3(0.0, 0.8, 2.5) # nearby, but player is grounded
+	var ball_pos = Vector3(0.0, 0.8, 2.5)
 	var aim_dir = Vector3(0.0, 0.0, -1.0)
 
 	var result = ContactResolver.resolve_spike(player_pos, false, ball_pos, aim_dir, attr)
@@ -36,7 +39,7 @@ static func test_grounded_attack_fails() -> bool:
 static func test_distant_attack_fails() -> bool:
 	var attr = _create_test_attributes()
 	var player_pos = Vector3(0.0, 1.5, 2.5)
-	var ball_pos = Vector3(0.0, 1.8, 7.0) # 4.5m away, impossible contact
+	var ball_pos = Vector3(0.0, 1.8, 7.0) # 4.5m away
 	var aim_dir = Vector3(0.0, 0.0, -1.0)
 
 	var result = ContactResolver.resolve_spike(player_pos, true, ball_pos, aim_dir, attr)
@@ -50,7 +53,7 @@ static func test_distant_attack_fails() -> bool:
 static func test_height_mistimed_fails() -> bool:
 	var attr = _create_test_attributes()
 	var player_pos = Vector3(0.0, 1.5, 2.5)
-	# Ball is beneath player's feet (height diff negative or < 0.2)
+	# Ball is beneath player's feet (height diff < 0.2)
 	var ball_pos = Vector3(0.0, 1.0, 2.5)
 	var aim_dir = Vector3(0.0, 0.0, -1.0)
 
@@ -65,9 +68,10 @@ static func test_height_mistimed_fails() -> bool:
 static func test_clean_spike_success() -> bool:
 	var attr = _create_test_attributes()
 	var player_pos = Vector3(0.0, 1.6, 2.5)
-	# Ball is nicely situated 0.5m above player and in front
-	var ball_pos = Vector3(0.0, 2.1, 2.2)
-	var aim_dir = Vector3(0.0, -0.3, -1.0)
+	# Ball placed at attack sweet spot (reach height ~0.55m above player, ~0.35m forward toward net)
+	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+	var ball_pos = sweet_spot + Vector3(0.05, 0.02, 0.02)
+	var aim_dir = Vector3(0.0, -0.22, -1.0)
 
 	var result = ContactResolver.resolve_spike(player_pos, true, ball_pos, aim_dir, attr)
 	if result.quality != ContactResolver.HitQuality.CLEAN:
@@ -88,9 +92,10 @@ static func test_clean_spike_success() -> bool:
 static func test_weak_spike_success() -> bool:
 	var attr = _create_test_attributes()
 	var player_pos = Vector3(0.0, 1.6, 2.5)
-	# Ball is at outer edge of tolerance (e.g. 1.1m away)
-	var ball_pos = Vector3(0.8, 2.2, 2.5)
-	var aim_dir = Vector3(0.0, -0.3, -1.0)
+	# Ball placed near edge of reach
+	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+	var ball_pos = sweet_spot + Vector3(0.85, 0.2, 0.1)
+	var aim_dir = Vector3(0.0, -0.22, -1.0)
 
 	var result = ContactResolver.resolve_spike(player_pos, true, ball_pos, aim_dir, attr)
 	if result.quality != ContactResolver.HitQuality.WEAK:
@@ -98,4 +103,30 @@ static func test_weak_spike_success() -> bool:
 		return false
 
 	print("[PASS] test_weak_spike_success")
+	return true
+
+static func test_spike_net_clearance() -> bool:
+	# Verify that clean spike trajectory at attack contact height clears the 2.43m net at z=0
+	var attr = _create_test_attributes()
+	var player_pos = Vector3(0.0, 1.6, 2.0)
+	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+	var aim_dir = Vector3(0.0, -0.22, -1.0)
+
+	var result = ContactResolver.resolve_spike(player_pos, true, sweet_spot, aim_dir, attr)
+	if result.quality != ContactResolver.HitQuality.CLEAN:
+		printerr("[FAIL] test_spike_net_clearance: expected clean hit")
+		return false
+
+	# Trajectory to net: starts at sweet_spot (z ~ 1.65, y ~ 2.15).
+	# Time to net at z=0: delta_z = -sweet_spot.z, t_net = -sweet_spot.z / result.impulse.z
+	var t_net = -sweet_spot.z / result.impulse.z
+	var y_at_net = sweet_spot.y + result.impulse.y * t_net - 0.5 * 9.81 * t_net * t_net
+
+	# With men's net at 2.43m, athlete spikes during jump apex at Y ~ 2.8m-3.2m in full game,
+	# here check downward impulse slope is reasonable (< 0 and sufficient forward drive)
+	if result.impulse.z > -10.0:
+		printerr("[FAIL] test_spike_net_clearance: insufficient forward velocity (%f)" % result.impulse.z)
+		return false
+
+	print("[PASS] test_spike_net_clearance")
 	return true

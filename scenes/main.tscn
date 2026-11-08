@@ -20,14 +20,15 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.0)
 follow_camera = NodePath("../FollowCamera")
 
-[node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("target")]
+[node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("target", "ball_target")]
 script = ExtResource("6_cam")
 target = NodePath("../Player")
+ball_target = NodePath("../Volleyball")
 
 [node name="Camera3D" type="Camera3D" parent="FollowCamera"]
-transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 2, 4.5)
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 2.1, 4.2)
 current = true
-fov = 65.0
+fov = 68.0
 
 [node name="Volleyball" parent="." instance=ExtResource("3_ball")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -10, 0)

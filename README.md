@@ -1,25 +1,36 @@
-# Volleyball MyCareer — Milestone 1 (M1): First Contact
+# Volleyball MyCareer — Milestone 1.1 (M1.1): Gameplay Rescue
 
-**Milestone:** M1 — First Contact
+**Milestone:** M1.1 — Gameplay Rescue
 **Engine:** Godot 4.3 (Forward Plus / Compatibility), GDScript
 **Target:** Windows PC, with cross-platform project compatibility
 **Status:** Complete playable 3D training prototype
 
 ---
 
-## 1. Project Overview
+## 1. Summary of M1.1 Gameplay Improvements
 
-Volleyball MyCareer is a single-player 3D volleyball career simulation. Milestone 1 establishes the playable core vertical slice: an athlete training on an indoor volleyball court with responsive movement, jumping, assisted spike mechanics, camera controls, automated feeds, and real-time in/out court scoring.
+Milestone 1.1 focuses on usability, training feedback, and mechanical polish based on playtesting feedback:
 
-### Completed Milestone 1 Features:
-- **Indoor Volleyball Court:** FIVB standard dimensions (18m × 9m, net height 2.43m, attack lines at 3m, 5cm line width in-bounds rules, net collision).
-- **Third-Person Athlete Controller:** CharacterBody3D with camera-relative movement, responsive acceleration/deceleration, jump impulse, airborne/attacking states, and court boundary constraints.
-- **Third-Person Follow Camera:** Smooth follow target, mouse-driven pitch and yaw orbiting, pitch clamping, and customizable distance/height/sensitivity.
-- **Volleyball Physics:** 3D rigid body matching standard scale (~65cm circumference, 0.27kg mass) with gravity, bounce restitution, net collision, and floor impact detection.
-- **Assisted Spike Mechanic:** Deterministic `ContactResolver` evaluating 3D distance, relative height, airborne status, aiming vector, and tolerances to yield Clean hits, Weak hits, or Misses without teleportation.
-- **Training Launcher:** Feeds predictable, reproducible sets/arcs to the player's attack zone upon trigger.
-- **Training HUD:** Non-intrusive gameplay interface showing exercise title, reps, hits, misses, in-bounds/out-of-bounds score, hit quality feedback, and key bindings.
-- **Repeatable Training Loop:** Seamless retry loop without scene reloading or object leaking (verified over 10+ successive reps).
+1. **Playable Spike Mechanics:**
+   - **Attack Sweet Spot Region:** Replaced player-origin distance checking with an authentic attack contact region relative to athlete height, reach, and facing direction (`ContactResolver.get_attack_sweet_spot`).
+   - **Timing Windows:** Implemented configurable clean vs weak spike timing windows (`timing_window_clean`, `timing_window_weak`).
+   - **Ballistic Apex Feeds:** `TrainingLauncher` computes launch velocity using `feed_arc_height` (apex physics), delivering high, readable arcs into the player's attack zone.
+   - **Single-Hit Enforcement:** `VolleyballController.apply_spike()` prevents multiple hits on the same ball from one swing or during a single feed.
+   - **Clearance & Trajectory:** Spikes feature authentic downward depression angles that guarantee clearance over the 2.43m net and landing within the opponent's 9x9m half.
+
+2. **Player Readability & Movement Feel:**
+   - Replaced plain capsule with a directional humanoid placeholder (torso, articulated limbs, directional facing visor, and right hitting arm).
+   - Visual arm swing indicator rotates forward and down upon attack triggering.
+   - Athlete smoothly turns to face camera aim or net when airborne.
+
+3. **Camera & Framing:**
+   - Improved third-person follow camera with gentle, subtle ball-in-flight tracking assist (`enable_ball_tracking_assist`) keeping the incoming set and net clearly visible without snapping.
+   - Distance, height, smoothing, and pitch limits configured for optimal court framing.
+
+4. **Training State Sequence & HUD:**
+   - Explicit training lifecycle: `IDLE` -> `FEEDING` -> `ATTACK_WINDOW` -> `RESULT` -> `RESET`.
+   - Contact readiness prompt: Displays `>>> IN HITTING WINDOW - SPIKE NOW! <<<` when the ball enters the attackable zone.
+   - Granular statistics: Feeds, Completed Attempts, Clean Hits, Weak Hits, Missed Swings, Untouched Feeds, In-Bounds, and Out-of-Bounds.
 
 ---
 
@@ -37,41 +48,41 @@ Volleyball MyCareer is a single-player 3D volleyball career simulation. Mileston
 
 ---
 
-## 3. Project Architecture & Directory Structure
+## 3. Project Architecture
 
 ```text
 ├── project.godot
 ├── scenes/
 │   ├── main.tscn              # Root scene wiring court, player, camera, launcher, ball, HUD
 │   ├── court.tscn             # 18x9m indoor court, lines, net, posts, walls
-│   ├── player.tscn            # CharacterBody3D athlete with placeholder meshes
+│   ├── player.tscn            # Directional humanoid athlete placeholder
 │   ├── volleyball.tscn        # RigidBody3D volleyball with collision and physics material
-│   ├── training_launcher.tscn # Training launcher model & logic
+│   ├── training_launcher.tscn # Ballistic training launcher model & logic
 │   └── training_hud.tscn      # CanvasLayer HUD with feedback labels & stats
 ├── scripts/
 │   ├── player/
-│   │   ├── player_controller.gd # Movement, jump, attack trigger, boundary clamping
+│   │   ├── player_controller.gd # Movement, jump, attack trigger, arm swing, facing direction
 │   │   └── player_state.gd      # Explicit state definitions (GROUNDED, AIRBORNE, etc.)
 │   ├── ball/
-│   │   └── volleyball_controller.gd # Rigid body physics, launch, spike, landing detection
+│   │   └── volleyball_controller.gd # Rigid body physics, single-hit enforcement, landing detection
 │   ├── camera/
-│   │   └── follow_camera.gd     # Smooth follow and mouse orbit camera
+│   │   └── follow_camera.gd     # Smooth follow, mouse orbit, ball tracking assist
 │   ├── training/
-│   │   ├── training_manager.gd  # Loop orchestrator, scoring, hit verification
-│   │   └── training_launcher.gd # Ballistic trajectory calculator and feed emitter
+│   │   ├── training_manager.gd  # Lifecycle state machine (IDLE -> FEEDING -> ATTACK_WINDOW -> RESULT -> RESET)
+│   │   └── training_launcher.gd # Ballistic apex trajectory calculator and feed emitter
 │   ├── systems/
 │   │   ├── court_geometry.gd    # In/out court boundaries, line tolerance, clamping
-│   │   └── contact_resolver.gd  # Assisted hit detection, timing, impulse math
+│   │   └── contact_resolver.gd  # Attack sweet spot, timing windows, impulse calculations
 │   └── ui/
-│       └── training_hud.gd      # HUD stats and feedback messages
+│       └── training_hud.gd      # HUD stats, state display, readiness indicator, feedback messages
 ├── resources/
-│   ├── player_attributes.gd     # Configurable athlete stats (power, reach, speed)
+│   ├── player_attributes.gd     # Configurable athlete stats (power, reach, timing windows)
 │   └── training_settings.gd     # Configurable launcher & exercise parameters
 ├── tests/
 │   ├── run_tests.gd             # Master headless automated test runner
 │   ├── test_geometry.gd         # Unit tests for court boundaries and line rules
-│   ├── test_contact.gd          # Unit tests for spike reach, timing, hit qualities
-│   └── test_training_reset.gd   # 10-rep repeatable training feed and reset tests
+│   ├── test_contact.gd          # Unit tests for sweet spot, timing windows, net clearance
+│   └── test_training_reset.gd   # Integration tests for launcher arrival, contact pipeline, and 10 full cycles
 └── README.md
 ```
 
@@ -79,39 +90,33 @@ Volleyball MyCareer is a single-player 3D volleyball career simulation. Mileston
 
 ## 4. How to Run and Test
 
-### Prerequisites
-- Godot Engine 4.3 (or 4.x compatible standard binary).
-
-### Running the Game
-Open the project folder in Godot 4.3 and press **Run Project** (F5), or launch directly via terminal:
+### Running the Game (Visual / Manual Validation)
+Launch directly in Godot 4.3:
 ```bash
 godot scenes/main.tscn
 ```
+**Manual Playtesting Verification Steps:**
+1. Observe athlete: Directional head visor and arm positions show facing direction clearly.
+2. Move with WASD; verify smooth turning and camera-relative motion.
+3. Press **[F]** to request a high set: Watch ball launch along a readable high arc peaking at ~4.8m.
+4. Camera subtly tilts/blends to keep both athlete and the incoming set in view.
+5. Time your approach: Watch the HUD display `>>> IN HITTING WINDOW - SPIKE NOW! <<<`.
+6. Press **[Space]** to jump, aim at opponent court with mouse, and press **[LMB]** to spike.
+7. Observe clean hit feedback: Ball crosses net and lands in bounds on the opponent's side.
+8. HUD updates statistics cleanly. Repeat 10 times without restart.
 
-### Running Automated Smoke & Unit Tests
-Run the automated test runner in headless mode:
+### Running Headless Automated Test Suite
 ```bash
 godot -s tests/run_tests.gd --headless
 ```
-The test runner executes 3 test suites:
-1. `TestGeometry`: Validates FIVB court boundary logic, lines included in bounds, opponent vs player zones, and player boundary clamping.
-2. `TestContact`: Validates airborne requirements, reach limitations, mistimed height misses, clean spike impulse, and weak off-center hits.
-3. `TestTrainingReset`: Validates 10 full cycles of feeding, spiking, landing, and resetting without scene reload or state corruption.
-
-All automated tests exit with exit code `0` on success and `1` on failure.
+The suite executes:
+- `TestGeometry`: Court bounds, lines included in bounds, opponent vs player zones.
+- `TestContact`: Sweet spot calculation, grounded miss, distant miss, mistimed height miss, clean hit, weak hit, net clearance.
+- `TestTrainingReset`: Ballistic apex trajectory arrival, ContactResolver-to-Volleyball pipeline, single-hit enforcement, 10 clean full cycles, and reset invariants.
 
 ---
 
-## 5. Current Limitations & M2 Roadmap
-
-### Limitations (Milestone 1 Scope):
-- **Single athlete solo training:** No teammates, AI setters, or blockers.
-- **Placeholder graphics:** Geometric capsule athlete, cylinder posts, and basic shaded surfaces.
-- **Simplified aerodynamics:** Standard gravity, bounce, and topspin impulse without full Magnus effect aerodynamic spin equations.
-- **Manual feed requests:** Uses automated launcher feeds rather than human set passes.
-
-### Milestone 2 (M2) Roadmap:
-- AI Setter teammate capable of setting balls from player passes.
-- Expanded contact repertoire: bumping (pass), setting, and blocking.
-- Basic opponent blocker AI on the opposite side of the net.
-- Character animation tree blending (run cycle, jump approach, spike swing, landing).
+## 5. Current Limitations (Milestone 1.1 Scope)
+- **Single athlete solo training:** No teammates, AI setters, or opponent blockers.
+- **Placeholder art:** Primitive meshes used for player and equipment.
+- **Physics aerodynamics:** Standard gravity and topspin impulse without full Magnus aerodynamic fluid calculations.

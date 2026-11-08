@@ -21,9 +21,9 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
+theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 20
+theme_override_constants/margin_bottom = 18
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
@@ -35,9 +35,15 @@ mouse_filter = 2
 
 [node name="ExerciseTitle" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
-size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 20
-text = "Spike Training (M1)"
+text = "Spike Training (M1.1)"
+
+[node name="PhaseLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Phase: IDLE"
+horizontal_alignment = 1
 
 [node name="StatsContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
@@ -45,8 +51,24 @@ mouse_filter = 2
 
 [node name="StatsLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar/StatsContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Reps: 0 | Hits: 0 | Misses: 0 | In-Bounds: 0 | Out: 0"
+theme_override_font_sizes/font_size = 15
+text = "Feeds: 0 | Hits: 0 (Clean: 0, Weak: 0) | Misses: 0 | Untouched: 0 | In: 0 | Out: 0"
+
+[node name="ReadinessContainer" type="CenterContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ReadinessPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/ReadinessContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ReadinessLabel" type="Label" parent="MarginContainer/VBoxContainer/ReadinessContainer/ReadinessPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.1, 1, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+text = ">>> IN HITTING WINDOW - SPIKE NOW! <<<"
+horizontal_alignment = 1
 
 [node name="CenterFeedback" type="CenterContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -54,6 +76,7 @@ size_flags_vertical = 3
 mouse_filter = 2
 
 [node name="FeedbackPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/CenterFeedback"]
+visible = false
 layout_mode = 2
 mouse_filter = 2
 
@@ -70,5 +93,5 @@ mouse_filter = 2
 [node name="ControlsHint" type="Label" parent="MarginContainer/VBoxContainer/BottomBar"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 14
 text = "[WASD] Move   [Space] Jump   [LMB] Spike Attack   [Mouse] Aim/Camera   [F] Request Feed   [R] Reset Ball   [Esc] Toggle Mouse"
