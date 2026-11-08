@@ -4,7 +4,7 @@ extends RigidBody3D
 const CourtGeometry = preload("res://scripts/systems/court_geometry.gd")
 const ContactResolver = preload("res://scripts/systems/contact_resolver.gd")
 
-signal ball_hit_registered(quality: int, impulse: Vector3)
+signal ball_hit_registered(quality: int, velocity: Vector3)
 signal ball_landed(landing_zone: int, position: Vector3)
 signal ball_net_hit()
 
@@ -20,7 +20,8 @@ var has_landed: bool = false
 var has_been_hit: bool = false
 var last_hit_quality: int = ContactResolver.HitQuality.MISS
 
-# Floor detection threshold
+# Standard volleyball radius: circumference 65-67cm => r = 0.105m
+const BALL_RADIUS: float = 0.105
 const FLOOR_Y_THRESHOLD: float = 0.12
 
 func _ready():
@@ -62,17 +63,17 @@ func launch(start_pos: Vector3, initial_velocity: Vector3):
 	linear_velocity = initial_velocity
 	angular_velocity = Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2))
 
-## Apply spike impulse to the ball (enforcing one hit per feed)
-func apply_spike(impulse: Vector3, quality: int) -> bool:
+## Apply post-contact velocity (in m/s) to the ball (enforcing one hit per feed)
+func apply_spike(post_contact_vel: Vector3, quality: int) -> bool:
 	if has_been_hit:
 		return false
 	has_been_hit = true
 	last_hit_quality = quality
 	current_state = BallState.SPIKED
-	linear_velocity = impulse
+	linear_velocity = post_contact_vel
 	# Add slight authentic topspin when spiked
-	angular_velocity = Vector3(-impulse.length() * 0.8, 0, 0)
-	ball_hit_registered.emit(quality, impulse)
+	angular_velocity = Vector3(-post_contact_vel.length() * 0.8, 0, 0)
+	ball_hit_registered.emit(quality, post_contact_vel)
 	return true
 
 ## Reset the ball physics state completely

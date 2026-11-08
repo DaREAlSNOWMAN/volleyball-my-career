@@ -10,17 +10,19 @@ const TrainingHUD = preload("res://scripts/ui/training_hud.gd")
 const TrainingSettings = preload("res://resources/training_settings.gd")
 const PlayerAttributes = preload("res://resources/player_attributes.gd")
 
-signal attempt_started(feed_index: int)
+signal attempt_started(attempt_id: int)
 signal training_state_changed(old_state: int, new_state: int)
 signal attempt_completed(result: Dictionary)
 
-## Training state sequence: IDLE -> FEEDING -> ATTACK_WINDOW -> RESULT -> RESET
+## Strict state sequence: IDLE -> PREPARING -> FEEDING -> ATTACKABLE -> RESOLVING -> RESULT -> RESET
 enum Phase {
 	IDLE = 0,
-	FEEDING = 1,
-	ATTACK_WINDOW = 2,
-	RESULT = 3,
-	RESET = 4
+	PREPARING = 1,
+	FEEDING = 2,
+	ATTACKABLE = 3,
+	RESOLVING = 4,
+	RESULT = 5,
+	RESET = 6
 }
 
 @export var player: PlayerController
@@ -29,24 +31,35 @@ enum Phase {
 @export var hud: TrainingHUD
 @export var settings: Resource # TrainingSettings
 
-# Statistics tracking
+# Unique attempt identification to prevent stale callbacks
+var current_attempt_id: int = 0
+
+# Accounting metrics
 var total_feeds: int = 0
 var completed_attempts: int = 0
 var clean_hits: int = 0
 var weak_hits: int = 0
 var missed_swings: int = 0
 var untouched_feeds: int = 0
+var net_faults: int = 0
 var in_bounds_hits: int = 0
 var out_of_bounds_hits: int = 0
+var manual_cancellations: int = 0
 
 var current_phase: Phase = Phase.IDLE
 var ball_has_been_hit: bool = false
 var player_swung_at_ball: bool = false
+var attempt_is_resolved: bool = false
+
 var auto_reset_timer: float = 0.0
+var feed_timeout_timer: float = 0.0
 
 func _ready():
 	if not settings:
 		settings = TrainingSettings.new()
+
+	if player and settings:
+		settings.apply_difficulty_preset(settings.current_difficulty, player.attributes)
 
 	if player:
 		player.attack_attempted.connect(_on_player_attack_attempted)
@@ -66,16 +79,30 @@ func _process(delta: float):
 		if auto_reset_timer <= 0.0:
 			reset_feed()
 
+	# Safeguard timeout for trapped balls
+	if current_phase == Phase.FEEDING or current_phase == Phase.ATTACKABLE:
+		feed_timeout_timer += delta
+		var max_timeout = settings.feed_timeout_duration if "feed_timeout_duration" in settings else 4.5
+		if feed_timeout_timer >= max_timeout:
+			_handle_feed_timeout()
+
 	if Input.is_action_just_pressed("request_feed"):
 		request_feed()
 	elif Input.is_action_just_pressed("reset_ball"):
-		reset_feed()
+		manual_reset()
 
 	_check_attack_window()
 
-## Evaluates whether the ball is currently in the attackable window for HUD and state
+func set_difficulty(preset: TrainingSettings.DifficultyPreset):
+	if settings:
+		settings.apply_difficulty_preset(preset, player.attributes if player else null)
+		_update_hud_display()
+		if hud:
+			hud.show_feedback("Difficulty: " + TrainingSettings.get_difficulty_name(preset), true, 1.5)
+
+## Evaluates whether the ball is currently in the attackable window
 func _check_attack_window():
-	if current_phase != Phase.FEEDING and current_phase != Phase.ATTACK_WINDOW:
+	if current_phase != Phase.FEEDING and current_phase != Phase.ATTACKABLE:
 		return
 
 	if not ball or not player:
@@ -85,17 +112,17 @@ func _check_attack_window():
 	var player_pos = player.global_position if player.is_inside_tree() else player.position
 	var facing_dir = player.get_player_facing_direction() if player.has_method("get_player_facing_direction") else Vector3(0, 0, -1)
 
-	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, facing_dir, player.attributes)
-	var dist = sweet_spot.distance_to(ball_pos)
+	var anchor = ContactResolver.get_contact_anchor(player_pos, facing_dir, player.attributes)
+	var dist = anchor.distance_to(ball_pos)
 	var max_reach = player.attributes.hit_assist_tolerance
 
 	var in_window = (dist <= max_reach and ball_pos.y >= 2.0 and not ball_has_been_hit)
 
 	if in_window and current_phase == Phase.FEEDING:
-		_set_phase(Phase.ATTACK_WINDOW)
+		_set_phase(Phase.ATTACKABLE)
 		if hud:
 			hud.set_window_readiness(true)
-	elif not in_window and current_phase == Phase.ATTACK_WINDOW and not ball_has_been_hit:
+	elif not in_window and current_phase == Phase.ATTACKABLE and not ball_has_been_hit:
 		_set_phase(Phase.FEEDING)
 		if hud:
 			hud.set_window_readiness(false)
@@ -104,28 +131,50 @@ func request_feed():
 	if not launcher or not ball:
 		return
 
+	# If already feeding or attackable, safe re-trigger
+	if current_phase == Phase.FEEDING or current_phase == Phase.ATTACKABLE:
+		manual_cancellations += 1
+
+	current_attempt_id += 1
+	var this_attempt = current_attempt_id
+
 	auto_reset_timer = 0.0
+	feed_timeout_timer = 0.0
 	ball_has_been_hit = false
 	player_swung_at_ball = false
+	attempt_is_resolved = false
 	total_feeds += 1
 
-	_set_phase(Phase.FEEDING)
+	_set_phase(Phase.PREPARING)
+	if ball:
+		ball.reset(Vector3(0, -10, 0))
+
+	# Launch feed
 	launcher.feed_ball(ball)
+	_set_phase(Phase.FEEDING)
 
 	if player and player.follow_camera and player.follow_camera.has_method("set_feed_tracking"):
 		player.follow_camera.set_feed_tracking(true)
 
 	_update_hud_display()
 	if hud:
-		hud.show_feedback("Incoming Set! Time your approach and jump", true, 1.5)
+		hud.show_feedback("Incoming Set! Time your jump and spike", true, 1.5)
 		hud.set_window_readiness(false)
 
-	attempt_started.emit(total_feeds)
+	attempt_started.emit(this_attempt)
+
+func manual_reset():
+	if current_phase == Phase.FEEDING or current_phase == Phase.ATTACKABLE:
+		manual_cancellations += 1
+	reset_feed()
 
 func reset_feed():
+	current_attempt_id += 1 # Invalidate in-flight attempt callbacks
 	auto_reset_timer = 0.0
+	feed_timeout_timer = 0.0
 	ball_has_been_hit = false
 	player_swung_at_ball = false
+	attempt_is_resolved = false
 
 	if player and player.follow_camera and player.follow_camera.has_method("set_feed_tracking"):
 		player.follow_camera.set_feed_tracking(false)
@@ -133,14 +182,36 @@ func reset_feed():
 	if ball:
 		ball.reset(Vector3(0, -10, 0))
 
+	_set_phase(Phase.RESET)
 	_set_phase(Phase.IDLE)
 	_update_hud_display()
 	if hud:
 		hud.set_window_readiness(false)
-		hud.show_feedback("Feed Ready. Press [F] for ball", true, 1.2)
+		hud.show_feedback("Feed Reset. Press [F] for new ball", true, 1.2)
 
-func _on_player_attack_attempted(player_pos: Vector3, is_airborne: bool, aim_direction: Vector3, facing_dir: Vector3 = Vector3(0, 0, -1)):
-	if not ball or (current_phase != Phase.FEEDING and current_phase != Phase.ATTACK_WINDOW):
+func _handle_feed_timeout():
+	if attempt_is_resolved:
+		return
+	attempt_is_resolved = true
+	completed_attempts += 1
+	if not player_swung_at_ball and not ball_has_been_hit:
+		untouched_feeds += 1
+	_set_phase(Phase.RESULT)
+	if hud:
+		hud.show_feedback("Feed timed out.", false, 1.5)
+		hud.set_window_readiness(false)
+	_update_hud_display()
+	auto_reset_timer = 1.0
+
+func _on_player_attack_attempted(
+	player_pos: Vector3,
+	is_airborne: bool,
+	aim_direction: Vector3,
+	facing_dir: Vector3 = Vector3(0, 0, -1),
+	swing_phase: int = 2,
+	swing_elapsed: float = 0.1
+):
+	if not ball or (current_phase != Phase.FEEDING and current_phase != Phase.ATTACKABLE):
 		return
 
 	player_swung_at_ball = true
@@ -152,14 +223,15 @@ func _on_player_attack_attempted(player_pos: Vector3, is_airborne: bool, aim_dir
 		ball_pos,
 		aim_direction,
 		player.attributes,
-		facing_dir
+		facing_dir,
+		swing_phase,
+		swing_elapsed
 	)
 
 	player.register_contact_result(contact_result)
 
 	if contact_result.quality != ContactResolver.HitQuality.MISS:
-		# Attempt to apply spike to ball (returns false if ball already spiked)
-		var applied = ball.apply_spike(contact_result.impulse, contact_result.quality)
+		var applied = ball.apply_spike(contact_result.post_contact_velocity, contact_result.quality)
 		if applied:
 			ball_has_been_hit = true
 			if contact_result.quality == ContactResolver.HitQuality.CLEAN:
@@ -167,7 +239,7 @@ func _on_player_attack_attempted(player_pos: Vector3, is_airborne: bool, aim_dir
 			else:
 				weak_hits += 1
 
-			_set_phase(Phase.RESULT)
+			_set_phase(Phase.RESOLVING)
 			if hud:
 				hud.show_feedback(contact_result.message, true, 2.0)
 				hud.set_window_readiness(false)
@@ -179,9 +251,10 @@ func _on_player_attack_attempted(player_pos: Vector3, is_airborne: bool, aim_dir
 	_update_hud_display()
 
 func _on_ball_landed(landing_zone: int, pos: Vector3):
-	if current_phase == Phase.IDLE or current_phase == Phase.RESET:
+	if current_phase == Phase.IDLE or current_phase == Phase.PREPARING or current_phase == Phase.RESET or attempt_is_resolved:
 		return
 
+	attempt_is_resolved = true
 	completed_attempts += 1
 	var zone_desc = ""
 	var is_in = false
@@ -216,6 +289,7 @@ func _on_ball_landed(landing_zone: int, pos: Vector3):
 	auto_reset_timer = settings.auto_reset_after_landing_delay
 
 	var attempt_data = {
+		"attempt_id": current_attempt_id,
 		"feed_index": total_feeds,
 		"was_hit": ball_has_been_hit,
 		"player_swung": player_swung_at_ball,
@@ -226,8 +300,10 @@ func _on_ball_landed(landing_zone: int, pos: Vector3):
 	attempt_completed.emit(attempt_data)
 
 func _on_ball_net_hit():
-	if hud and (current_phase == Phase.FEEDING or current_phase == Phase.ATTACK_WINDOW or current_phase == Phase.RESULT):
-		hud.show_feedback("Ball contacted net!", false, 1.5)
+	if current_phase == Phase.FEEDING or current_phase == Phase.ATTACKABLE or current_phase == Phase.RESOLVING:
+		net_faults += 1
+		if hud:
+			hud.show_feedback("Net Fault! Ball contacted net", false, 1.5)
 
 func _set_phase(new_phase: Phase):
 	if current_phase == new_phase:
@@ -240,7 +316,9 @@ func _set_phase(new_phase: Phase):
 
 func _update_hud_display():
 	if hud:
-		var successful_hits = clean_hits + weak_hits
+		var diff_name = TrainingSettings.get_difficulty_name(settings.current_difficulty) if settings else "Standard"
+		if hud.has_method("set_difficulty_display"):
+			hud.set_difficulty_display(diff_name)
 		hud.update_stats(
 			total_feeds,
 			completed_attempts,

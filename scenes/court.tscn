@@ -1,26 +1,26 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=21 format=3]
 
 [sub_resource type="BoxShape3D" id="floor_shape"]
-size = Vector3(22, 1, 30)
+size = Vector3(26, 1, 34)
 
 [sub_resource type="StandardMaterial3D" id="mat_gym_floor"]
-albedo_color = Color(0.18, 0.22, 0.28, 1)
-roughness = 0.45
+albedo_color = Color(0.12, 0.15, 0.20, 1)
+roughness = 0.55
 
 [sub_resource type="BoxMesh" id="floor_mesh"]
 material = SubResource("mat_gym_floor")
-size = Vector3(22, 1, 30)
+size = Vector3(26, 1, 34)
 
 [sub_resource type="StandardMaterial3D" id="mat_court_surface"]
-albedo_color = Color(0.85, 0.52, 0.22, 1)
-roughness = 0.35
+albedo_color = Color(0.86, 0.48, 0.18, 1)
+roughness = 0.32
 
 [sub_resource type="BoxMesh" id="court_mesh"]
 material = SubResource("mat_court_surface")
 size = Vector3(9, 0.02, 18)
 
 [sub_resource type="StandardMaterial3D" id="mat_lines"]
-albedo_color = Color(0.96, 0.96, 0.96, 1)
+albedo_color = Color(0.98, 0.98, 0.98, 1)
 
 [sub_resource type="BoxMesh" id="boundary_line_x"]
 material = SubResource("mat_lines")
@@ -39,16 +39,23 @@ size = Vector3(9.6, 1.0, 0.08)
 
 [sub_resource type="StandardMaterial3D" id="mat_net"]
 transparency = 1
-albedo_color = Color(0.85, 0.85, 0.85, 0.7)
+albedo_color = Color(0.92, 0.92, 0.92, 0.75)
 roughness = 0.6
 
 [sub_resource type="BoxMesh" id="net_mesh"]
 material = SubResource("mat_net")
 size = Vector3(9.5, 1.0, 0.05)
 
+[sub_resource type="StandardMaterial3D" id="mat_top_tape"]
+albedo_color = Color(1, 1, 1, 1)
+
+[sub_resource type="BoxMesh" id="top_tape_mesh"]
+material = SubResource("mat_top_tape")
+size = Vector3(9.5, 0.07, 0.06)
+
 [sub_resource type="StandardMaterial3D" id="mat_posts"]
-albedo_color = Color(0.2, 0.2, 0.25, 1)
-metallic = 0.6
+albedo_color = Color(0.85, 0.25, 0.2, 1)
+metallic = 0.4
 roughness = 0.3
 
 [sub_resource type="CylinderMesh" id="post_mesh"]
@@ -62,15 +69,15 @@ height = 2.7
 radius = 0.08
 
 [sub_resource type="StandardMaterial3D" id="mat_walls"]
-albedo_color = Color(0.12, 0.14, 0.18, 1)
-roughness = 0.8
+albedo_color = Color(0.14, 0.17, 0.22, 1)
+roughness = 0.85
 
 [sub_resource type="BoxMesh" id="wall_mesh_z"]
 material = SubResource("mat_walls")
-size = Vector3(26, 8, 1)
+size = Vector3(30, 8, 1)
 
 [sub_resource type="BoxShape3D" id="wall_shape_z"]
-size = Vector3(26, 8, 1)
+size = Vector3(30, 8, 1)
 
 [node name="Court" type="Node3D"]
 
@@ -125,6 +132,10 @@ shape = SubResource("net_shape")
 
 [node name="NetMesh" type="MeshInstance3D" parent="NetStructure"]
 mesh = SubResource("net_mesh")
+
+[node name="TopTape" type="MeshInstance3D" parent="NetStructure"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("top_tape_mesh")
 
 [node name="PostLeft" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.0, 1.35, 0)

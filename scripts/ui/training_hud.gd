@@ -2,6 +2,7 @@ class_name TrainingHUD
 extends Control
 
 @onready var exercise_title_label: Label = $MarginContainer/VBoxContainer/TopBar/ExerciseTitle
+@onready var difficulty_label: Label = $MarginContainer/VBoxContainer/TopBar/DifficultyLabel
 @onready var phase_label: Label = $MarginContainer/VBoxContainer/TopBar/PhaseLabel
 @onready var stats_label: Label = $MarginContainer/VBoxContainer/TopBar/StatsContainer/StatsLabel
 @onready var readiness_indicator: PanelContainer = $MarginContainer/VBoxContainer/ReadinessContainer/ReadinessPanel
@@ -26,6 +27,10 @@ func set_exercise_title(title: String):
 	if exercise_title_label:
 		exercise_title_label.text = title
 
+func set_difficulty_display(diff_name: String):
+	if difficulty_label:
+		difficulty_label.text = "[" + diff_name + "]"
+
 func set_training_phase(phase_name: String):
 	if phase_label:
 		phase_label.text = "Phase: " + phase_name
@@ -45,8 +50,8 @@ func update_stats(
 	out_of_bounds: int
 ):
 	if stats_label:
-		stats_label.text = "Feeds: %d | Hits: %d (Clean: %d, Weak: %d) | Misses: %d | Untouched: %d | In: %d | Out: %d" % [
-			feeds, (clean + weak), clean, weak, missed, untouched, in_bounds, out_of_bounds
+		stats_label.text = "Feeds: %d | Done: %d | Hits: %d (C: %d, W: %d) | Miss: %d | Untouched: %d | In: %d | Out: %d" % [
+			feeds, completed, (clean + weak), clean, weak, missed, untouched, in_bounds, out_of_bounds
 		]
 
 func show_feedback(message: String, is_positive: bool = true, duration: float = 2.0):

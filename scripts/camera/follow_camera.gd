@@ -39,26 +39,35 @@ func _process(delta: float):
 	if not target:
 		return
 
-	var target_focus_pos = target.global_position + Vector3(0, height, 0)
+	var target_base_pos = target.global_position if target.is_inside_tree() else target.position
+	var target_focus_pos = target_base_pos + Vector3(0, height, 0)
 
-	# Subtle framing assist: when ball is in flight, slightly bias focus towards the ball
+	# Frame-rate safe interpolation factor
+	var follow_blend = 1.0 - exp(-follow_smooth_speed * delta)
+
+	# Subtle framing assist: when ball is in flight, gently bias focus towards the ball
 	if enable_ball_tracking_assist and is_feed_active and ball_target and is_instance_valid(ball_target):
-		var ball_pos = ball_target.global_position
-		# Only bias if ball is in front of athlete (z < player.z + 1.0 and y > 1.0)
-		if ball_pos.y > 1.0 and ball_pos.z < target.global_position.z + 2.0:
-			var blend_factor = 0.22 # gentle 22% blend toward ball to keep athlete central
+		var ball_pos = ball_target.global_position if ball_target.is_inside_tree() else ball_target.position
+		# Only bias if ball is in front of athlete (z < target.z + 1.5 and y > 1.0)
+		if ball_pos.y > 1.0 and ball_pos.z < target_base_pos.z + 2.0:
+			var blend_factor = 0.20 # gentle 20% blend toward ball to keep athlete central
 			target_focus_pos = target_focus_pos.lerp(ball_pos, blend_factor)
 
-	global_position = global_position.lerp(target_focus_pos, follow_smooth_speed * delta)
+	if is_inside_tree():
+		global_position = global_position.lerp(target_focus_pos, follow_blend)
+	else:
+		position = position.lerp(target_focus_pos, follow_blend)
 
 func set_feed_tracking(active: bool):
 	is_feed_active = active
+
+func toggle_ball_tracking():
+	enable_ball_tracking_assist = not enable_ball_tracking_assist
 
 func _update_camera_orientation():
 	rotation_degrees.y = yaw
 	if camera:
 		camera.rotation_degrees.x = pitch
-		# Camera distance offset behind athlete
 		camera.position = Vector3(0, 0, distance)
 
 func _toggle_mouse_capture():

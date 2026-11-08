@@ -36,7 +36,13 @@ mouse_filter = 2
 [node name="ExerciseTitle" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Spike Training (M1.1)"
+text = "Spike Training (M1.2)"
+
+[node name="DifficultyLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.2, 1)
+theme_override_font_sizes/font_size = 18
+text = "[Beginner]"
 
 [node name="PhaseLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
@@ -52,7 +58,7 @@ mouse_filter = 2
 [node name="StatsLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar/StatsContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 15
-text = "Feeds: 0 | Hits: 0 (Clean: 0, Weak: 0) | Misses: 0 | Untouched: 0 | In: 0 | Out: 0"
+text = "Feeds: 0 | Done: 0 | Hits: 0 (C: 0, W: 0) | Miss: 0 | Untouched: 0 | In: 0 | Out: 0"
 
 [node name="ReadinessContainer" type="CenterContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

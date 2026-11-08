@@ -19,7 +19,6 @@ static func run_all() -> bool:
 	return passed
 
 static func test_launcher_feed_arrival_region() -> bool:
-	# Verify that a launched feed arrives at the target attack region near the net
 	var launcher = TrainingLauncher.new()
 	var settings = TrainingSettings.new()
 	settings.feed_arc_height = 4.8
@@ -29,7 +28,6 @@ static func test_launcher_feed_arrival_region() -> bool:
 	var ball = VolleyballController.new()
 	launcher.feed_ball(ball)
 
-	# Verify initial launch velocity has upward drive reaching above 4.5m
 	var v_y = ball.linear_velocity.y
 	var apex_y = launcher.get_launcher_position().y + (v_y * v_y) / (2.0 * 9.81)
 
@@ -37,7 +35,6 @@ static func test_launcher_feed_arrival_region() -> bool:
 		printerr("[FAIL] test_launcher_feed_arrival_region: apex height too low (%f)" % apex_y)
 		return false
 
-	# Verify horizontal velocities aim toward player side (z > 0)
 	if ball.linear_velocity.z <= 0.0:
 		printerr("[FAIL] test_launcher_feed_arrival_region: ball should travel toward player side (z > 0)")
 		return false
@@ -46,21 +43,20 @@ static func test_launcher_feed_arrival_region() -> bool:
 	return true
 
 static func test_real_contact_pipeline_integration() -> bool:
-	# Verify that ContactResolver correctly connects with VolleyballController
 	var attr = PlayerAttributes.new()
 	var player_pos = Vector3(0.0, 1.6, 2.5)
 	var ball = VolleyballController.new()
-	var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
+	var anchor = ContactResolver.get_contact_anchor(player_pos, Vector3(0, 0, -1), attr)
 
 	ball.launch(Vector3(0, 0, 0), Vector3(0, 5, 2))
-	var aim_dir = Vector3(0.0, -0.22, -1.0)
+	var aim_dir = Vector3(0.0, -0.20, -1.0)
 
-	var contact_res = ContactResolver.resolve_spike(player_pos, true, sweet_spot, aim_dir, attr)
+	var contact_res = ContactResolver.resolve_spike(player_pos, true, anchor, aim_dir, attr)
 	if contact_res.quality != ContactResolver.HitQuality.CLEAN:
 		printerr("[FAIL] test_real_contact_pipeline_integration: expected clean contact")
 		return false
 
-	var applied = ball.apply_spike(contact_res.impulse, contact_res.quality)
+	var applied = ball.apply_spike(contact_res.post_contact_velocity, contact_res.quality)
 	if not applied or ball.current_state != VolleyballController.BallState.SPIKED:
 		printerr("[FAIL] test_real_contact_pipeline_integration: ball failed to apply spike")
 		return false
@@ -109,10 +105,10 @@ static func test_repeat_loop_10_times() -> bool:
 		# 2. Simulate spike contact through real ContactResolver
 		var player_pos = Vector3(0.0, 1.6, 2.5)
 		var attr = PlayerAttributes.new()
-		var sweet_spot = ContactResolver.get_attack_sweet_spot(player_pos, Vector3(0, 0, -1), attr)
-		var contact = ContactResolver.resolve_spike(player_pos, true, sweet_spot, Vector3(0, -0.22, -1), attr)
+		var anchor = ContactResolver.get_contact_anchor(player_pos, Vector3(0, 0, -1), attr)
+		var contact = ContactResolver.resolve_spike(player_pos, true, anchor, Vector3(0, -0.20, -1), attr)
 
-		var hit_success = ball.apply_spike(contact.impulse, contact.quality)
+		var hit_success = ball.apply_spike(contact.post_contact_velocity, contact.quality)
 		if not hit_success or ball.current_state != VolleyballController.BallState.SPIKED:
 			printerr("[FAIL] test_repeat_loop_10_times (rep %d): expected SPIKED" % rep)
 			return false

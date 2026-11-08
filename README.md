@@ -1,36 +1,47 @@
-# Volleyball MyCareer — Milestone 1.1 (M1.1): Gameplay Rescue
+# Volleyball MyCareer — Milestone 1.2 (M1.2): Foundation Stabilization
 
-**Milestone:** M1.1 — Gameplay Rescue
+**Milestone:** M1.2 — Autonomous Foundation Stabilization
 **Engine:** Godot 4.3 (Forward Plus / Compatibility), GDScript
 **Target:** Windows PC, with cross-platform project compatibility
-**Status:** Complete playable 3D training prototype
+**Status:** Mechanically Verified 3D Spike-Training Prototype — Human Playtest Required
 
 ---
 
-## 1. Summary of M1.1 Gameplay Improvements
+## 1. Summary of M1.2 Architectural & Mechanical Enhancements
 
-Milestone 1.1 focuses on usability, training feedback, and mechanical polish based on playtesting feedback:
+Milestone 1.2 focuses on foundation stabilization, mathematical correctness, lifecycle hardening, and full scene-level automated integration testing:
 
-1. **Playable Spike Mechanics:**
-   - **Attack Sweet Spot Region:** Replaced player-origin distance checking with an authentic attack contact region relative to athlete height, reach, and facing direction (`ContactResolver.get_attack_sweet_spot`).
-   - **Timing Windows:** Implemented configurable clean vs weak spike timing windows (`timing_window_clean`, `timing_window_weak`).
-   - **Ballistic Apex Feeds:** `TrainingLauncher` computes launch velocity using `feed_arc_height` (apex physics), delivering high, readable arcs into the player's attack zone.
-   - **Single-Hit Enforcement:** `VolleyballController.apply_spike()` prevents multiple hits on the same ball from one swing or during a single feed.
-   - **Clearance & Trajectory:** Spikes feature authentic downward depression angles that guarantee clearance over the 2.43m net and landing within the opponent's 9x9m half.
+1. **Physical & Trajectory Accuracy:**
+   - **Net-Clearance Guarantee:** Spike trajectory assertions in `tests/test_contact.gd` rigorously verify net-plane intersection ($Z = 0$), accounting for the 0.105m ball radius over the 2.43m men's net height, as well as downstream landing within the 9×9m opponent court.
+   - **Post-Contact Velocity Terminology:** Standardized post-contact physical velocities ($m/s$) across `VolleyballController` and `ContactResolver`, distinguishing physical velocities from raw impulse units ($N\cdot s$).
+   - **Contact Anchor:** Evaluates contact based on the striking hand's spatial position high and forward/right of the athlete during full extension rather than the character root origin.
 
-2. **Player Readability & Movement Feel:**
-   - Replaced plain capsule with a directional humanoid placeholder (torso, articulated limbs, directional facing visor, and right hitting arm).
-   - Visual arm swing indicator rotates forward and down upon attack triggering.
-   - Athlete smoothly turns to face camera aim or net when airborne.
+2. **Temporal Attack Lifecycle:**
+   - Implemented explicit swing phases in `ContactResolver` and `PlayerController`:
+     $$\text{READY} \rightarrow \text{WINDUP (80ms)} \rightarrow \text{ACTIVE\_CONTACT (160ms)} \rightarrow \text{FOLLOW\_THROUGH (120ms)} \rightarrow \text{RECOVERY (90ms)}$$
+   - Hits initiated prematurely in windup or belatedly in follow-through are rejected as authentic temporal misses.
 
-3. **Camera & Framing:**
-   - Improved third-person follow camera with gentle, subtle ball-in-flight tracking assist (`enable_ball_tracking_assist`) keeping the incoming set and net clearly visible without snapping.
-   - Distance, height, smoothing, and pitch limits configured for optimal court framing.
+3. **Hardened Training State Machine:**
+   - State progression: $\text{IDLE} \rightarrow \text{PREPARING} \rightarrow \text{FEEDING} \rightarrow \text{ATTACKABLE} \rightarrow \text{RESOLVING} \rightarrow \text{RESULT} \rightarrow \text{RESET}$.
+   - **Unique Attempt IDs:** Every feed is assigned an incremental attempt ID. In-flight callbacks arriving from prior or cancelled feeds are rejected to prevent counter corruption.
+   - **Timeout Safeguard:** Trapped or unresolvable feeds automatically resolve after a bounded timeout ($4.5s$), preventing locked states.
 
-4. **Training State Sequence & HUD:**
-   - Explicit training lifecycle: `IDLE` -> `FEEDING` -> `ATTACK_WINDOW` -> `RESULT` -> `RESET`.
-   - Contact readiness prompt: Displays `>>> IN HITTING WINDOW - SPIKE NOW! <<<` when the ball enters the attackable zone.
-   - Granular statistics: Feeds, Completed Attempts, Clean Hits, Weak Hits, Missed Swings, Untouched Feeds, In-Bounds, and Out-of-Bounds.
+4. **Difficulty Presets:**
+   - **Beginner (Default):** High feed arc ($5.2m$ apex), generous contact tolerance ($1.6m$), wider timing windows ($0.35s$ clean / $0.60s$ weak).
+   - **Standard:** Balanced feed arc ($4.8m$ apex), authentic timing ($0.25s$ clean / $0.45s$ weak), $1.35m$ tolerance.
+   - **Advanced:** Demanding set placement ($4.4m$ apex), tight timing ($0.18s$ clean / $0.35s$ weak), $1.15m$ tolerance.
+
+5. **Automated Playtest Harness (`tests/test_playtest_harness.gd`):**
+   - **Scenario A:** Full scene integration spike from feed to in-bounds opponent court landing.
+   - **Scenario B:** Early swing rejection during windup.
+   - **Scenario C:** Late swing rejection during follow-through.
+   - **Scenario D:** Distant attack rejection beyond reach.
+   - **Scenario E:** Net collision detection and net fault recording.
+   - **Scenario F:** Out-of-bounds landing classification.
+   - **Scenario G:** Rapid reset clearing outdated landing events.
+   - **Scenario H:** Repeated feed requests without memory corruption or state stalling.
+   - **Scenario I:** 100 consecutive training cycles executing cleanly without memory leaks or counter drift.
+   - **Scenario J:** Camera and movement stability verifying non-divergent finite transforms.
 
 ---
 
@@ -54,69 +65,65 @@ Milestone 1.1 focuses on usability, training feedback, and mechanical polish bas
 ├── project.godot
 ├── scenes/
 │   ├── main.tscn              # Root scene wiring court, player, camera, launcher, ball, HUD
-│   ├── court.tscn             # 18x9m indoor court, lines, net, posts, walls
-│   ├── player.tscn            # Directional humanoid athlete placeholder
+│   ├── court.tscn             # 18x9m indoor court, lines, net, posts, walls, top-tape
+│   ├── player.tscn            # Directional humanoid athlete placeholder with articulated arm
 │   ├── volleyball.tscn        # RigidBody3D volleyball with collision and physics material
 │   ├── training_launcher.tscn # Ballistic training launcher model & logic
 │   └── training_hud.tscn      # CanvasLayer HUD with feedback labels & stats
 ├── scripts/
 │   ├── player/
-│   │   ├── player_controller.gd # Movement, jump, attack trigger, arm swing, facing direction
+│   │   ├── player_controller.gd # Movement, jump, attack lifecycle, arm swing, facing direction
 │   │   └── player_state.gd      # Explicit state definitions (GROUNDED, AIRBORNE, etc.)
 │   ├── ball/
 │   │   └── volleyball_controller.gd # Rigid body physics, single-hit enforcement, landing detection
 │   ├── camera/
-│   │   └── follow_camera.gd     # Smooth follow, mouse orbit, ball tracking assist
+│   │   └── follow_camera.gd     # Smooth follow, mouse orbit, ball tracking assist toggle
 │   ├── training/
-│   │   ├── training_manager.gd  # Lifecycle state machine (IDLE -> FEEDING -> ATTACK_WINDOW -> RESULT -> RESET)
+│   │   ├── training_manager.gd  # Lifecycle state machine (IDLE -> PREPARING -> FEEDING -> ATTACKABLE -> RESOLVING -> RESULT -> RESET)
 │   │   └── training_launcher.gd # Ballistic apex trajectory calculator and feed emitter
 │   ├── systems/
 │   │   ├── court_geometry.gd    # In/out court boundaries, line tolerance, clamping
-│   │   └── contact_resolver.gd  # Attack sweet spot, timing windows, impulse calculations
+│   │   └── contact_resolver.gd  # Attack contact anchor, swing phases, timing windows, net clearance
 │   └── ui/
-│       └── training_hud.gd      # HUD stats, state display, readiness indicator, feedback messages
+│       └── training_hud.gd      # HUD stats, difficulty display, readiness indicator, feedback messages
 ├── resources/
 │   ├── player_attributes.gd     # Configurable athlete stats (power, reach, timing windows)
-│   └── training_settings.gd     # Configurable launcher & exercise parameters
+│   └── training_settings.gd     # Configurable difficulty presets, launcher & exercise parameters
 ├── tests/
 │   ├── run_tests.gd             # Master headless automated test runner
 │   ├── test_geometry.gd         # Unit tests for court boundaries and line rules
-│   ├── test_contact.gd          # Unit tests for sweet spot, timing windows, net clearance
-│   └── test_training_reset.gd   # Integration tests for launcher arrival, contact pipeline, and 10 full cycles
+│   ├── test_contact.gd          # Unit tests for contact anchor, swing phases, net clearance
+│   ├── test_training_reset.gd   # Unit tests for launcher arrival, contact pipeline, and 10 full cycles
+│   └── test_playtest_harness.gd # Scene-level integration harness (Scenarios A through J & 100 cycles)
 └── README.md
 ```
 
 ---
 
-## 4. How to Run and Test
+## 4. Running the Tests and Scene
 
-### Running the Game (Visual / Manual Validation)
-Launch directly in Godot 4.3:
-```bash
-godot scenes/main.tscn
-```
-**Manual Playtesting Verification Steps:**
-1. Observe athlete: Directional head visor and arm positions show facing direction clearly.
-2. Move with WASD; verify smooth turning and camera-relative motion.
-3. Press **[F]** to request a high set: Watch ball launch along a readable high arc peaking at ~4.8m.
-4. Camera subtly tilts/blends to keep both athlete and the incoming set in view.
-5. Time your approach: Watch the HUD display `>>> IN HITTING WINDOW - SPIKE NOW! <<<`.
-6. Press **[Space]** to jump, aim at opponent court with mouse, and press **[LMB]** to spike.
-7. Observe clean hit feedback: Ball crosses net and lands in bounds on the opponent's side.
-8. HUD updates statistics cleanly. Repeat 10 times without restart.
-
-### Running Headless Automated Test Suite
+### Headless Automated Test Execution
+Run the complete automated test suite (including unit tests and the 100-cycle scene integration harness):
 ```bash
 godot -s tests/run_tests.gd --headless
 ```
-The suite executes:
-- `TestGeometry`: Court bounds, lines included in bounds, opponent vs player zones.
-- `TestContact`: Sweet spot calculation, grounded miss, distant miss, mistimed height miss, clean hit, weak hit, net clearance.
-- `TestTrainingReset`: Ballistic apex trajectory arrival, ContactResolver-to-Volleyball pipeline, single-hit enforcement, 10 clean full cycles, and reset invariants.
+*Expected Result:* All 4 test suites pass with exit code `0`.
+
+### Manual Playtesting Instructions
+Launch the game in Godot 4.3:
+```bash
+godot scenes/main.tscn
+```
+1. **Movement & Camera:** Use WASD to navigate the player's court half. Use the mouse to orbit smoothly. Note the front-facing visor and procedural arm motion.
+2. **Requesting a Set:** Press **[F]** to trigger a high set. The camera smoothly tracks the ball while maintaining player focus.
+3. **Approach & Jump:** Move toward the landing shadow near the attack line. Press **[Space]** to jump.
+4. **Timing the Spike:** Watch for the `>>> IN HITTING WINDOW - SPIKE NOW! <<<` prompt on the HUD. Click **[LMB]** during the jump apex.
+5. **Evaluating the Outcome:** Observe the ball clear the white top tape of the net and descend onto the opponent's side of the court. The HUD registers a Clean Hit and In-Bounds Point.
+6. **Cancellation & Resets:** Press **[R]** mid-feed to verify immediate cancellation without trapped state.
 
 ---
 
-## 5. Current Limitations (Milestone 1.1 Scope)
-- **Single athlete solo training:** No teammates, AI setters, or opponent blockers.
-- **Placeholder art:** Primitive meshes used for player and equipment.
-- **Physics aerodynamics:** Standard gravity and topspin impulse without full Magnus aerodynamic fluid calculations.
+## 5. Current Limitations (Milestone 1.2 Scope)
+- **Single-Athlete Focus:** Teammate AI, setter AI, and opponent blockers remain non-goals for M1.
+- **Placeholder Art:** Geometric primitive meshes and untextured PBR materials.
+- **Status:** Mechanically verified through automated test suites and scene integration harness. Final gameplay feel requires subjective human playtesting.
